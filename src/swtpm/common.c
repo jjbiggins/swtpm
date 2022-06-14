@@ -268,6 +268,14 @@ static const OptionDesc seccomp_opt_desc[] = {
 };
 #endif
 
+static const OptionDesc profile_opt_desc[] = {
+    {
+        .name = "rules",
+        .type = OPT_TYPE_STRING,
+    },
+    END_OPTION_DESC
+};
+
 /*
  * handle_log_options:
  * Parse and act upon the parsed log options. Initialize the logging.
@@ -1360,3 +1368,64 @@ int handle_seccomp_options(char *options, unsigned int *seccomp_action)
     return 0;
 }
 #endif /* WITH_SECCOMP */
+
+static int parse_profile_options(char *options, char **profile_rules)
+{
+    OptionValues *ovs = NULL;
+    char *error = NULL;
+    const char *rules;
+    size_t i;
+
+    ovs = options_parse(options, profile_opt_desc, &error);
+    if (!ovs) {
+        logprintf(STDERR_FILENO, "Error parsing profile options: %s\n", error);
+        goto error;
+    }
+
+    rules = option_get_string(ovs, "rules", NULL);
+    if (rules) {
+        *profile_rules = strdup(rules);
+        if (!*profile_rules)
+            goto oom_error;
+        for (i = 0; i < strlen(rules); i++) {
+            if ((*profile_rules)[i] == ':')
+                (*profile_rules)[i] = ',';
+        }
+    }
+
+    option_values_free(ovs);
+
+    return 0;
+
+oom_error:
+    logprintf(STDERR_FILENO,
+              "Out of memory to allocate rules\n");
+
+error:
+    option_values_free(ovs);
+    free(error);
+
+    return -1;
+}
+
+/*
+ * handle_profile_options:
+ * Parse the 'profile' options.
+ *
+ * @options: the porfile options to parse
+ * @profile_rules: pointer to a buffer for the profile rules to pass to libtpms
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+int handle_profile_options(char *options, char **profile_rules)
+{
+    *profile_rules = NULL;
+
+    if (!options)
+        return 0;
+
+    if (parse_profile_options(options, profile_rules) < 0)
+        return -1;
+
+    return 0;
+}

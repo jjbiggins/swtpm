@@ -431,7 +431,7 @@ static void worker_thread(gpointer data, gpointer user_data SWTPM_ATTR_UNUSED)
  * @res: the result from starting the TPM
  */
 static int tpm_start(uint32_t flags, TPMLIB_TPMVersion l_tpmversion,
-                     TPM_RESULT *res)
+                     const char *profile, TPM_RESULT *res)
 {
     DIR *dir;
     const char *uri = tpmstate_get_backend_uri();
@@ -470,7 +470,7 @@ static int tpm_start(uint32_t flags, TPMLIB_TPMVersion l_tpmversion,
         goto error_del_pool;
     }
 
-    *res = tpmlib_start(flags, l_tpmversion);
+    *res = tpmlib_start(flags, l_tpmversion, profile);
     if (*res != TPM_SUCCESS)
         goto error_del_pool;
 
@@ -973,6 +973,7 @@ static void ptm_ioctl(fuse_req_t req, int cmd, void *arg,
     bool exit_prg = FALSE;
     ptm_init *init_p;
     TPM_MODIFIER_INDICATOR orig_locality;
+    const char *profile = NULL;
 
     /* some commands have to wait until the worker thread is done */
     switch(cmd) {
@@ -1056,7 +1057,8 @@ static void ptm_ioctl(fuse_req_t req, int cmd, void *arg,
             TPMLIB_Terminate();
 
             tpm_running = false;
-            if (tpm_start(init_p->u.req.init_flags, tpmversion, &res) < 0) {
+            if (tpm_start(init_p->u.req.init_flags, tpmversion,
+                          profile, &res) < 0) {
                 logprintf(STDERR_FILENO,
                           "Error: Could not initialize the TPM.\n");
             } else {
@@ -1464,6 +1466,7 @@ int swtpm_cuse_main(int argc, char **argv, const char *prgname, const char *ifac
     };
     const char *devname = NULL;
     char *cinfo_argv[1] = { 0 };
+    char *profile = NULL;
     unsigned int num;
     struct passwd *passwd;
     const char *uri = NULL;
@@ -1703,7 +1706,7 @@ int swtpm_cuse_main(int argc, char **argv, const char *prgname, const char *ifac
     worker_thread_init();
 
     if (!need_init_cmd) {
-        if (tpm_start(0, tpmversion, &res) < 0) {
+        if (tpm_start(0, tpmversion, profile, &res) < 0) {
             ret = -1;
             goto exit;
         }
@@ -1726,6 +1729,7 @@ int swtpm_cuse_main(int argc, char **argv, const char *prgname, const char *ifac
     ret = ptm_cuse_lowlevel_main(1, argv, &cinfo, &clops, &param);
 
 exit:
+    free(profile);
     ptm_cleanup();
     free(cinfo_argv[0]);
 

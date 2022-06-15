@@ -32,6 +32,7 @@
 
 #include <libtpms/tpm_nvfilename.h>
 
+#include "profiles.h"
 #include "swtpm.h"
 #include "swtpm_setup_conf.h"
 #include "swtpm_setup_utils.h"
@@ -495,14 +496,14 @@ static int init_tpm2(unsigned long flags, gchar **swtpm_prg_l, const gchar *conf
                      const gchar *tpm2_state_path, const gchar *vmid, const gchar *pcr_banks,
                      const gchar *swtpm_keyopt, int *fds_to_pass, size_t n_fds_to_pass,
                      unsigned int rsa_keysize, const gchar *certsdir,
-                     const gchar *user_certsdir)
+                     const gchar *user_certsdir, const gchar *profile_rules)
 {
     struct swtpm2 *swtpm2;
     struct swtpm *swtpm;
     int ret;
 
     swtpm2 = swtpm2_new(swtpm_prg_l, tpm2_state_path, swtpm_keyopt, gl_LOGFILE,
-                        fds_to_pass, n_fds_to_pass);
+                        fds_to_pass, n_fds_to_pass, profile_rules);
     if (swtpm2 == NULL)
         return 1;
     swtpm = &swtpm2->swtpm;
@@ -1189,6 +1190,9 @@ int main(int argc, char *argv[])
         {"version", no_argument, NULL, '1'},
         {"print-capabilities", no_argument, NULL, 'y'},
         {"reconfigure", no_argument, NULL, 'R'},
+#ifdef HAVE_LIBTPMS_SETPROFILE_API
+        {"profile", required_argument, NULL, 'I'},
+#endif
         {"help", no_argument, NULL, 'h'},
         {NULL, 0, NULL, 0}
     };
@@ -1216,6 +1220,7 @@ int main(int argc, char *argv[])
     g_autofree gchar *runas = NULL;
     g_autofree gchar *certsdir = NULL;
     g_autofree gchar *user_certsdir = NULL;
+    g_autofree gchar *profile_rules = NULL;
     gchar *tmp;
     gchar **swtpm_prg_l = NULL;
     gchar **tmp_l = NULL;
@@ -1397,6 +1402,12 @@ int main(int argc, char *argv[])
             break;
         case 'R': /* --reconfigure */
             flags |= SETUP_RECONFIGURE_F;
+            break;
+        case 'I': /* --profile */
+            ret = get_rules_by_profile(optarg, &profile_rules);
+            if (ret < 0) {
+                goto error;
+            }
             break;
         case '?':
         case 'h': /* --help */
@@ -1652,7 +1663,7 @@ int main(int argc, char *argv[])
     } else {
         ret = init_tpm2(flags, swtpm_prg_l, config_file, tpm_state_path, vmid, pcr_banks,
                        swtpm_keyopt, fds_to_pass, n_fds_to_pass, rsa_keysize, certsdir,
-                       user_certsdir);
+                       user_certsdir, profile_rules);
     }
 
     if (ret == 0) {

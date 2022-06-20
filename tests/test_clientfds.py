@@ -37,12 +37,12 @@ def spawn_swtpm():
               (swtpm_exe, tpmpath, pidfile))
         return False
 
-    cmd = swtpm_exe + " socket --fd=" + str(_fd.fileno())
-    cmd += " --ctrl type=unixio,clientfd=" + str(_ctrlfd.fileno())
-    cmd += " --pid file=" + pidfile + " --tpmstate dir=" + tpmpath
+    cmd = f"{swtpm_exe} socket --fd={str(_fd.fileno())}"
+    cmd += f" --ctrl type=unixio,clientfd={str(_ctrlfd.fileno())}"
+    cmd += f" --pid file={pidfile} --tpmstate dir={tpmpath}"
     if os.getenv('SWTPM_TEST_SECCOMP_OPT'):
         cmd += " " + os.getenv('SWTPM_TEST_SECCOMP_OPT')
-    print("Running child cmd: %s" % cmd)
+    print(f"Running child cmd: {cmd}")
     try:
         if sys.version_info[0] >= 3:
             child = subprocess.Popen(cmd.split(),
@@ -95,10 +95,7 @@ def test_get_caps():
 
 if __name__ == "__main__":
     try:
-        if not spawn_swtpm() or not test_get_caps():
-            res = 1
-        else:
-            res = 0
+        res = 1 if not spawn_swtpm() or not test_get_caps() else 0
     except:
         print("__Exception: ", sys.exc_info())
         res = -1
